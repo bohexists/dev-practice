@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -54,8 +55,12 @@ func main() {
 	tasks := make(chan Task, len(users))
 	var wg sync.WaitGroup
 
-	// Create a pool of 5 workers
-	for i := 1; i <= 5; i++ {
+	// Get the number of available CPU cores
+	numWorkers := runtime.NumCPU() * 100
+	fmt.Printf("Using %d workers\n", numWorkers)
+
+	// Create a pool of workers equal to the number of CPU cores
+	for i := 1; i <= numWorkers; i++ {
 		wg.Add(1)
 		go worker(i, tasks, &wg)
 	}
@@ -79,6 +84,8 @@ func saveUserInfo(user User) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	defer file.Close()
 
 	file.WriteString(user.getActivityInfo())
 	time.Sleep(time.Second)
