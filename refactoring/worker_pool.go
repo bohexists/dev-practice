@@ -1,10 +1,3 @@
-package main
-
-import (
-	"fmt"
-	"time"
-)
-
 func main() {
 	t := time.Now()
 	const jobsCount, workerCount = 15, 3

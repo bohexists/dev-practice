@@ -1,3 +1,14 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"math/rand"
+	"os"
+	"sync"
+	"time"
+)
+
 var actions = []string{"logged in", "logged out", "created record", "deleted record", "updated account"}
 
 type logItem struct {
@@ -11,24 +22,24 @@ type User struct {
 	logs  []logItem
 }
 
-// Worker struct to hold the user and allow processing in the worker pool.
-type Task struct {
-	user User
-}
-
 func (u User) getActivityInfo() string {
 	output := fmt.Sprintf("UID: %d; Email: %s;\nActivity Log:\n", u.id, u.email)
 	for index, item := range u.logs {
 		output += fmt.Sprintf("%d. [%s] at %s\n", index, item.action, item.timestamp.Format(time.RFC3339))
 	}
-
 	return output
 }
 
-// Worker function that processes tasks.
-func worker(id int, tasks <-chan Task, wg *sync.WaitGroup) {
+// Task represents a unit of work for a worker.
+type Task struct {
+	user User
+}
+
+// worker is a function that will be run as a goroutine.
+// It processes tasks from the jobs channel and sends the results to the results channel.
+func worker(id int, jobs <-chan Task, wg *sync.WaitGroup) {
 	defer wg.Done()
-	for task := range tasks {
+	for task := range jobs {
 		saveUserInfo(task.user)
 		fmt.Printf("Worker %d processed user %d\n", id, task.user.id)
 	}
@@ -40,24 +51,24 @@ func main() {
 	startTime := time.Now()
 
 	users := generateUsers(100)
-	tasks := make(chan Task, len(users))
+	jobs := make(chan Task, len(users))
 	var wg sync.WaitGroup
 
-	// Get the number of available CPU cores
-	numWorkers := runtime.NumCPU() * 100
+	// Determine the number of workers
+	numWorkers := 100
 	fmt.Printf("Using %d workers\n", numWorkers)
 
-	// Create a pool of workers equal to the number of CPU cores
+	// Start the workers
 	for i := 1; i <= numWorkers; i++ {
 		wg.Add(1)
-		go worker(i, tasks, &wg)
+		go worker(i, jobs, &wg)
 	}
 
-	// Send tasks to the worker pool
+	// Distribute the work to the workers
 	for _, user := range users {
-		tasks <- Task{user: user}
+		jobs <- Task{user: user}
 	}
-	close(tasks)
+	close(jobs)
 
 	// Wait for all workers to finish
 	wg.Wait()
@@ -65,14 +76,18 @@ func main() {
 }
 
 func saveUserInfo(user User) {
+
+	if err := os.MkdirAll("refactoring/users", os.ModePerm); err != nil {
+		log.Fatal(err)
+	}
+
 	fmt.Printf("WRITING FILE FOR UID %d\n", user.id)
 
-	filename := fmt.Sprintf("users/uid%d.txt", user.id)
+	filename := fmt.Sprintf("refactoring/users/uid%d.txt", user.id)
 	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	defer file.Close()
 
 	file.WriteString(user.getActivityInfo())
