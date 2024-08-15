@@ -1,15 +1,3 @@
-package main
-
-import (
-	"fmt"
-	"log"
-	"math/rand"
-	"os"
-	"runtime"
-	"sync"
-	"time"
-)
-
 var actions = []string{"logged in", "logged out", "created record", "deleted record", "updated account"}
 
 type logItem struct {
